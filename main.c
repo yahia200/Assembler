@@ -226,7 +226,7 @@ void printRegs(){
 
 void printDataMem(){
     for(int i = 0; i<2048; i++)
-        printf("DATA%d: %d | ", i, (uint8_t)*(datatMem+i));
+        printf("DATA%d: %d | ", i, (int8_t)*(datatMem+i));
 }
 
 void printInsMem(){
