@@ -2,9 +2,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-int16_t instMem[1024] = {0b0100000000111010,0b0001000001000010, 0b0010000001000011};//halt = 49152
+int16_t instMem[1024] = {0b0100000000111010,0b0001000000000011};
 int8_t datatMem[2048];
-int8_t regs[65]={0,10,5,4}; //[64] = STUTUS REG
+int8_t regs[64]={0,10,5,6};
+bool status[8];// 0=Zero, 1=Sign, 2=Negative, 3=Two’s Complement Overflow, 4=Carry
 uint16_t* PC=instMem;
 int8_t decodedOp[3];
 uint16_t IR;
@@ -22,6 +23,7 @@ int main(){
         printf("Operand1: %d\n", decodedOp[1]);
         printf("Operand2: %d\n", decodedOp[2]);
         execute();
+        printStatus();
         incrmentPC();
         fetch();
         cycle++;
@@ -49,9 +51,8 @@ void decode(){
 }
 void execute(){
     int opCode = decodedOp[0];
-    int* operand1;
-    int* operand2;
-    int* status = &regs[64];
+    int8_t* operand1;
+    int8_t* operand2;
     int imm;
     switch (opCode)
     {
@@ -59,10 +60,7 @@ void execute(){
         operand1 = &regs[0] + (decodedOp[1]);
         operand2 = &regs[0] + (decodedOp[2]);
         *operand1 += *operand2;
-        if(*operand1 == 0)
-            *status |= 0x0001;
-        else
-            *status &= 0x111E;
+        status[0]= (*operand1==0);
 
         break;
 
@@ -70,36 +68,26 @@ void execute(){
         operand1 = regs + decodedOp[1];
         operand2 = regs + decodedOp[2];
         *operand1 -= *operand2;
-        if(*operand1 == 0)
-            *status |= 0x0001;
-        else
-            *status &= 0x111E;
+        status[0]= (*operand1==0);
         break;
 
     case 3://MUL
         operand1 = regs + decodedOp[1];
         operand2 = regs + decodedOp[2];
         *operand1 *= *operand2;
-        if(*operand1 == 0)
-            *status |= 0x0001;
-        else
-            *status &= 0x111E;
+        status[0]= (*operand1==0);
         break;
 
     case 4://MOVI
-    operand1 = &regs[0] + (decodedOp[1]);
+    operand1 = &regs[0];
     imm = decodedOp[2];
     *operand1 = imm;
-    if(*operand1 == 0)
-            *status |= 0x0001;
-        else
-            *status &= 0x111E;
         break;
 
     case 5://BEQZ
         operand1 = &regs[0] + (decodedOp[1]);
         imm = decodedOp[2];
-        if(operand1 == 0)
+        if(*operand1 == 0)
             PC += imm;
         break;
 
@@ -107,20 +95,14 @@ void execute(){
     operand1 = &regs[0] + (decodedOp[1]);
     imm = decodedOp[2];
     *operand1 &= imm;
-    if(*operand1 == 0)
-            *status |= 0x0001;
-        else
-            *status &= 0x111E;
+    status[0]= (*operand1==0);
         break;
 
     case 7://EOR
     operand1 = &regs[0] + (decodedOp[1]);
     imm = decodedOp[2];
     *operand1 ^= imm;
-    if(*operand1 == 0)
-            *status |= 0x0001;
-        else
-            *status &= 0x111E;
+    status[0]= (*operand1==0);
         break;
     
 
@@ -133,21 +115,14 @@ void execute(){
     case 9://SAL
         operand1 = &regs[0] + (decodedOp[1]);
         imm = decodedOp[2];
-        *operand1 <<= imm;
-        if(*operand1 == 0)
-            *status |= 0x0001;
-        else
-            *status &= 0x111E;
+        status[0]= (*operand1==0);
         break;
 
     case 10://SAR
         operand1 = &regs[0] + (decodedOp[1]);
         imm = decodedOp[2];
         *operand1 >>= imm;
-        if(*operand1 == 0)
-            *status |= 0x0001;
-        else
-            *status &= 0x111E;
+        status[0]= (*operand1==0);
         break;
 
     case 11://LDR
@@ -176,6 +151,12 @@ if (negative)
   *num |= 0xFFFFFFC0;
 else
   nativeInt = num;
+}
+
+void printStatus(){
+    for(int i=0;i<8;i++){
+        printf("%d:  %d  |  ", i, status[i]);
+    }
 }
 
 
