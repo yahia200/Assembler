@@ -4,7 +4,7 @@
 
 int8_t* operand1;
 int8_t* operand2;
-int16_t instMem[1024] = {0b1011000000000000,0b1011000001000001,0b0001000000000001};
+int16_t instMem[1024] = {0b1011000000000000,0b1011000001000001,0b0001000000000001, 62000};//halt = 62000
 int8_t datatMem[2048]={0b10000000, 0b10000000};
 int8_t regs[64]={0,10,5,6};
 int fetched = 0;
@@ -34,6 +34,21 @@ int main(){
     return 0;
 }
 
+void init(){
+    char const* const fileName = "code.txt";
+    FILE* file = fopen(fileName, "r"); 
+    char line[256];
+
+    while (fgets(line, sizeof(line), file)) {
+        //n3ml 7aga f el "line"
+        printf("%s", line); 
+    }
+
+    fclose(file);
+
+    return 0;
+}
+
 
 
 void endCycle(){
@@ -43,7 +58,7 @@ void endCycle(){
 
 
 void fetch(){
-    if(*PC!=0){
+    if(*PC!=62000){
     IR = *PC;
     printf("Fetching:  %d | Instruction: %d\n", ++fetched, IR);
     PC++;
@@ -57,9 +72,7 @@ void decode(){
     printf("Decodinging: %d | ", ++decoded);
     decodedOp[0] = IR >> 12;
     decodedOp[1] = (IR & 0x03f0) >> 6;
-    twosComp(&decodedOp[1]);
     decodedOp[2] = (IR & 0x003f);
-    twosComp(&decodedOp[2]);
     operand1 = regs + (decodedOp[1]);
     operand2 = regs + (decodedOp[2]);
     
@@ -75,7 +88,7 @@ void execute(){
     int imm;
     switch (opCode)
     {
-    case 1://ADD
+    case 0://ADD
         status[4] = (((uint8_t)*operand1 + (uint8_t)*operand2)&(1<<8)) != 0;
         if(!((*operand1<0) ^ (*operand2<0))){
             status[3] = ((*operand1<0) ^ ((int8_t)(*operand2 + *operand1) < 0));
@@ -90,7 +103,7 @@ void execute(){
 
         break;
 
-    case 2://SUB
+    case 1://SUB
         if(((*operand1<0) ^ (*operand2<0))){
             status[3] = ((*operand1<0) ^ ((int8_t)(*operand1 - *operand2) < 0));
         }
@@ -103,7 +116,7 @@ void execute(){
         status[1] = status[2] ^ status[3];
         break;
 
-    case 3://MUL
+    case 2://MUL
         printf("REG%d: %d -> ", (int)operand1 - (int)regs, *operand1);
         *operand1 *= *operand2;
         printf("%d\n", *operand1);
@@ -111,21 +124,24 @@ void execute(){
         status[2] = (*operand1 < 0);
         break;
 
-    case 4://MOVI
+    case 3://MOVI
         imm = decodedOp[2];
+        twosComp(&imm);
         printf("REG%d: %d -> ", (int)operand1 - (int)regs, *operand1);
         *operand1 = imm;
         printf("%d\n", *operand1);
         break;
 
-    case 5://BEQZ
+    case 4://BEQZ
         imm = decodedOp[2];
+        twosComp(&imm);
         if(*operand1 == 0)
             PC += imm;
         break;
 
-    case 6://ANDI
+    case 5://ANDI
     imm = decodedOp[2];
+    twosComp(&imm);
     printf("REG%d: %d -> ", (int)operand1 - (int)regs, *operand1);
     *operand1 &= imm;
     printf("%d\n", *operand1);
@@ -133,8 +149,9 @@ void execute(){
     status[2] = (*operand1 < 0);
         break;
 
-    case 7://EOR
+    case 6://EOR
     imm = decodedOp[2];
+    twosComp(&imm);
     printf("REG%d: %d -> ", (int)operand1 - (int)regs, *operand1);
     *operand1 ^= imm;
     printf("%d\n", *operand1);
@@ -143,20 +160,22 @@ void execute(){
         break;
     
 
-    case 8://BR
+    case 7://BR
         int16_t target = (*operand1<<8);
         target |= *operand2;
         PC = target;
         break;
     
-    case 9://SAL
+    case 8://SAL
         imm = decodedOp[2];
+        twosComp(&imm);
         status[0]= (*operand1==0);
         status[2] = (*operand1 < 0);
         break;
 
-    case 10://SAR
+    case 9://SAR
         imm = decodedOp[2];
+        twosComp(&imm);
         printf("REG%d: %d -> ", (int)operand1 - (int)regs, *operand1);
         *operand1 >>= imm;
         printf("%d\n", *operand1);
@@ -164,7 +183,7 @@ void execute(){
         status[2] = (*operand1 < 0);
         break;
 
-    case 11://LDR
+    case 10://LDR
         operand2 = &datatMem[0] + (decodedOp[2]);
         printf("REG%d: %d -> ", (int)operand1 - (int)regs, *operand1);
         *operand1 = *operand2;
@@ -172,7 +191,7 @@ void execute(){
         break;
     
 
-    case 12://STR
+    case 11://STR
         operand2 = &datatMem[0] + (decodedOp[2]);
         printf("MEM%d: %d -> ", (int)operand2 - (int)datatMem, *operand2);
         *operand2 = *operand1;
