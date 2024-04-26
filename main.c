@@ -213,6 +213,7 @@ void end(){
     printDataMem();
     println(300);
     printInsMem();
+    println(300);
 }
 
 void printRegs(){
