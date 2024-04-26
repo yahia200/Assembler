@@ -2,35 +2,31 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-int instMem[1024] = {0b0011000000111010,0b0000000001000010, 0b0001000001000011,0b1100000000000000};//halt = 49152
-int datatMem[2048];
-int regs[65]={0,10,5,4}; //[64] = STUTUS REG
+int16_t instMem[1024] = {0b0100000000111010,0b0001000001000010, 0b0010000001000011};//halt = 49152
+int8_t datatMem[2048];
+int8_t regs[65]={0,10,5,4}; //[64] = STUTUS REG
 uint16_t* PC=instMem;
-int decodedOp[3];
+int8_t decodedOp[3];
 uint16_t IR;
+int cycle = 0;
 bool halt = false;
-int tet= 0b00000000000000000000000000111010;
 
 
 int main(){
-
-    twosComp(&tet);
-    printf("%d", tet);
-    // while(!halt){
-    // fetch();
-    // printf("IR: %d\n", IR);
-    // decode();
-    // printf("op: %d\n", decodedOp[0]);
-    // printf("reg1: %d\n", decodedOp[1]);
-    // printf("reg1 data: %d\n", regs[decodedOp[1]]);
-    // printf("reg2: %d\n", decodedOp[2]);
-    // printf("reg2 data: %d\n", regs[2]);
-    // execute();
-    // printf("reg1: %d\n", regs[decodedOp[1]]);
-    // incrmentPC();
-    // }
-
-    // printf("%d", regs[0]);
+    fetch();
+    while(IR != 0){
+        printf("Cycle: %d\n\n", cycle);
+        printf("IR: %d\n", IR);
+        decode();
+        printf("op: %d\n", decodedOp[0]);
+        printf("Operand1: %d\n", decodedOp[1]);
+        printf("Operand2: %d\n", decodedOp[2]);
+        execute();
+        incrmentPC();
+        fetch();
+        cycle++;
+        printf("\n\n\n");
+    }
     return 0;
 }
 
@@ -59,7 +55,7 @@ void execute(){
     int imm;
     switch (opCode)
     {
-    case 0://add
+    case 1://ADD
         operand1 = &regs[0] + (decodedOp[1]);
         operand2 = &regs[0] + (decodedOp[2]);
         *operand1 += *operand2;
@@ -70,7 +66,7 @@ void execute(){
 
         break;
 
-    case 1://sub
+    case 2://SUB
         operand1 = regs + decodedOp[1];
         operand2 = regs + decodedOp[2];
         *operand1 -= *operand2;
@@ -80,7 +76,7 @@ void execute(){
             *status &= 0x111E;
         break;
 
-    case 2://mul
+    case 3://MUL
         operand1 = regs + decodedOp[1];
         operand2 = regs + decodedOp[2];
         *operand1 *= *operand2;
@@ -90,7 +86,7 @@ void execute(){
             *status &= 0x111E;
         break;
 
-    case 3://mov imm
+    case 4://MOVI
     operand1 = &regs[0] + (decodedOp[1]);
     imm = decodedOp[2];
     *operand1 = imm;
@@ -100,14 +96,14 @@ void execute(){
             *status &= 0x111E;
         break;
 
-    case 4://branch if = 0
+    case 5://BEQZ
         operand1 = &regs[0] + (decodedOp[1]);
         imm = decodedOp[2];
         if(operand1 == 0)
             PC += imm;
         break;
 
-    case 5://and imm
+    case 6://ANDI
     operand1 = &regs[0] + (decodedOp[1]);
     imm = decodedOp[2];
     *operand1 &= imm;
@@ -117,7 +113,7 @@ void execute(){
             *status &= 0x111E;
         break;
 
-    case 6://xor
+    case 7://EOR
     operand1 = &regs[0] + (decodedOp[1]);
     imm = decodedOp[2];
     *operand1 ^= imm;
@@ -128,13 +124,13 @@ void execute(){
         break;
     
 
-    case 7://branch reg
+    case 8://BR
         operand1 = &regs[0] + (decodedOp[1]);
         operand2 = &regs[0] + (decodedOp[2]);
         PC = *operand1 || *operand2;
         break;
     
-    case 8://shift arith l
+    case 9://SAL
         operand1 = &regs[0] + (decodedOp[1]);
         imm = decodedOp[2];
         *operand1 <<= imm;
@@ -144,7 +140,7 @@ void execute(){
             *status &= 0x111E;
         break;
 
-    case 9://shift arith r
+    case 10://SAR
         operand1 = &regs[0] + (decodedOp[1]);
         imm = decodedOp[2];
         *operand1 >>= imm;
@@ -154,26 +150,17 @@ void execute(){
             *status &= 0x111E;
         break;
 
-    case 10://ld to reg
+    case 11://LDR
         operand1 = &regs[0] + (decodedOp[1]);
         operand2 = &datatMem[0] + (decodedOp[2]);
         *operand1 = *operand2;
-        if(*operand1 == 0)
-            *status |= 0x0001;
-        else
-            *status &= 0x111E;
         break;
     
 
-    case 11://str from reg
+    case 12://STR
         operand1 = &regs[0] + (decodedOp[1]);
         operand2 = &datatMem[0] + (decodedOp[2]);
         *operand2 = *operand1;
-        //zero flag ?????
-        break;
-
-    case 12://halt
-        halt = true;
         break;
 
     default:
@@ -181,15 +168,14 @@ void execute(){
     }
 }
 
-void twosComp(int* smallInt){
-    const int negative = (*smallInt & (1 << 5)) != 0;
-    printf("%d     twoooooooooooooo\n", negative);
+void twosComp(int8_t* num){
+    const int negative = (*num & (1 << 5)) != 0;
     int nativeInt;
 
 if (negative)
-  *smallInt |= 0xFFFFFFC0;
+  *num |= 0xFFFFFFC0;
 else
-  nativeInt = smallInt;
+  nativeInt = num;
 }
 
 
