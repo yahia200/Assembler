@@ -2,8 +2,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-int16_t instMem[1024] = {0b0100000000111010,0b0001000000000011};
-int8_t datatMem[2048];
+int16_t instMem[1024] = {0b1011000000000000,0b1011000001000001,0b0001000000000001};
+int8_t datatMem[2048]={0b10000000, 0b10000000};
 int8_t regs[64]={0,10,5,6};
 bool status[8];// 0=Zero, 1=Sign, 2=Negative, 3=Two’s Complement Overflow, 4=Carry
 uint16_t* PC=instMem;
@@ -20,9 +20,9 @@ int main(){
         printf("IR: %d\n", IR);
         decode();
         printf("op: %d\n", decodedOp[0]);
-        printf("Operand1: %d\n", decodedOp[1]);
-        printf("Operand2: %d\n", decodedOp[2]);
         execute();
+        printf("Operand1: %d\n", regs[decodedOp[1]]);
+        printf("Operand2: %d\n", regs[decodedOp[2]]);
         printStatus();
         incrmentPC();
         fetch();
@@ -59,16 +59,29 @@ void execute(){
     case 1://ADD
         operand1 = &regs[0] + (decodedOp[1]);
         operand2 = &regs[0] + (decodedOp[2]);
+        status[4] = (((uint8_t)*operand1 + (uint8_t)*operand2)&(1<<8)) != 0;
+        if(!((*operand1<0) ^ (*operand2<0))){
+            status[3] = ((*operand1<0) ^ ((int8_t)(*operand2 + *operand1) < 0));
+        }
+        else status[3] = false;
         *operand1 += *operand2;
-        status[0]= (*operand1==0);
+        status[0] = (*operand1==0);
+        status[2] = (*operand1 < 0);
+        status[1] = status[2] ^ status[3];
 
         break;
 
     case 2://SUB
         operand1 = regs + decodedOp[1];
         operand2 = regs + decodedOp[2];
+        if(((*operand1<0) ^ (*operand2<0))){
+            status[3] = ((*operand1<0) ^ ((int8_t)(*operand1 - *operand2) < 0));
+        }
+        else status[3] = false;
         *operand1 -= *operand2;
         status[0]= (*operand1==0);
+        status[2] = (*operand1 < 0);
+        status[1] = status[2] ^ status[3];
         break;
 
     case 3://MUL
@@ -76,6 +89,7 @@ void execute(){
         operand2 = regs + decodedOp[2];
         *operand1 *= *operand2;
         status[0]= (*operand1==0);
+        status[2] = (*operand1 < 0);
         break;
 
     case 4://MOVI
@@ -96,6 +110,7 @@ void execute(){
     imm = decodedOp[2];
     *operand1 &= imm;
     status[0]= (*operand1==0);
+    status[2] = (*operand1 < 0);
         break;
 
     case 7://EOR
@@ -103,6 +118,7 @@ void execute(){
     imm = decodedOp[2];
     *operand1 ^= imm;
     status[0]= (*operand1==0);
+    status[2] = (*operand1 < 0);
         break;
     
 
@@ -116,6 +132,7 @@ void execute(){
         operand1 = &regs[0] + (decodedOp[1]);
         imm = decodedOp[2];
         status[0]= (*operand1==0);
+        status[2] = (*operand1 < 0);
         break;
 
     case 10://SAR
@@ -123,6 +140,7 @@ void execute(){
         imm = decodedOp[2];
         *operand1 >>= imm;
         status[0]= (*operand1==0);
+        status[2] = (*operand1 < 0);
         break;
 
     case 11://LDR
