@@ -35,6 +35,7 @@ int main(){
     return 0;
 }
 
+
 void init(){
     char splitLine[10][10];
     char const* const fileName = "code.txt"; /* should check that argc > 1 */
@@ -55,6 +56,7 @@ void init(){
     fclose(file);
 }
 
+
 void split(char str1[], char splitLine[10][10]){
     int i, j, ctr;
 
@@ -72,6 +74,7 @@ void split(char str1[], char splitLine[10][10]){
         }
     }
 }
+
 
 int parseOP(char OP[10]){
     char OPs[12][10] = {"ADD","SUB", "MUL", "MOVI", "BEQZ", "ANDI", "EOR", "BR", "SAL", "SAR", "LDR", "STR"};
@@ -283,6 +286,7 @@ void end(){
     println(300);
 }
 
+
 void printRegs(){
 
     for(int i = 0; i<64; i++)
@@ -291,10 +295,12 @@ void printRegs(){
     printStatus();
 }
 
+
 void printDataMem(){
     for(int i = 0; i<2048; i++)
         printf("DATA%d: %d | ", i, (int8_t)*(datatMem+i));
 }
+
 
 void printInsMem(){
     for(int i = 0; i<1024; i++)
