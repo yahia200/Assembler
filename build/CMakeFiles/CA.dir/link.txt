@@ -1,0 +1,1 @@
+/usr/bin/gcc -g -rdynamic CMakeFiles/CA.dir/main.c.o -o CA 

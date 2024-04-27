@@ -1,0 +1,7 @@
+[
+{
+  "directory": "/home/yahiaunix/CA/CA/build",
+  "command": "/usr/bin/gcc   -g -o CMakeFiles/CA.dir/main.c.o -c /home/yahiaunix/CA/CA/main.c",
+  "file": "/home/yahiaunix/CA/CA/main.c"
+}
+]
