@@ -4,8 +4,8 @@
 
 int8_t* operand1;
 int8_t* operand2;
-int16_t instMem[1024] = {0b1011000000000000,0b1011000001000001,0b0001000000000001, 62000};//halt = 62000
-int8_t datatMem[2048]={0b10000000, 0b10000000};
+uint16_t instMem[1024];//halt = 62000
+int8_t datatMem[2048]={7, 5};
 int8_t regs[64]={0,10,5,6};
 int fetched = 0;
 int decoded = 0;
@@ -19,6 +19,7 @@ bool halt = false;
 
 
 int main(){
+    init();
     while(!halt){
         printf("Cycle:  %d\n\n", cycle);
         if(decoded > 0)
@@ -35,20 +36,67 @@ int main(){
 }
 
 void init(){
-    char const* const fileName = "code.txt";
-    FILE* file = fopen(fileName, "r"); 
+    char splitLine[10][10];
+    char const* const fileName = "code.txt"; /* should check that argc > 1 */
+    FILE* file = fopen(fileName, "r"); /* should check the result */
     char line[256];
+    int c = 0;
 
     while (fgets(line, sizeof(line), file)) {
-        //n3ml 7aga f el "line"
-        printf("%s", line); 
+        split(line, splitLine);
+        addToInsMem(splitLine, c);
+        c++;
+        
+
+        
     }
+    instMem[c] = 62000;
 
     fclose(file);
-
-    return 0;
 }
 
+void split(char str1[], char splitLine[10][10]){
+    int i, j, ctr;
+
+    j = 0;
+    ctr = 0;
+
+    for (i = 0; i <= (strlen(str1)); i++) {
+        if (str1[i] == ' ' || str1[i] == '\0') {
+            splitLine[ctr][j] = '\0';
+            ctr++;
+            j = 0;
+        } else {
+            splitLine[ctr][j] = str1[i];
+            j++;
+        }
+    }
+}
+
+int parseOP(char OP[10]){
+    char OPs[12][10] = {"ADD","SUB", "MUL", "MOVI", "BEQZ", "ANDI", "EOR", "BR", "SAL", "SAR", "LDR", "STR"};
+
+    for (int i = 0; i < 12; i++){
+        if(strcmp(OP, OPs[i]) == 0)
+            return (int)i;
+    }
+}
+
+
+int parseOperand(char OP[10]){
+    uintmax_t num = strtoumax(OP, NULL, 10);
+    
+}
+
+
+void addToInsMem(char splitLine[10][10], int c){
+        int16_t OP = parseOP(splitLine[0]);
+        int16_t operand1 = parseOperand(splitLine[1]);
+        int16_t operand2 = parseOperand(splitLine[2]);
+        uint16_t ins = (OP<<12) | (operand1<<6) | (operand2);
+        instMem[c] = ins;
+
+}
 
 
 void endCycle(){
