@@ -6,7 +6,7 @@ int8_t* operand1;
 int8_t* operand2;
 uint16_t instMem[1024];//halt = 62000
 int8_t datatMem[2048]={7, 5};
-int8_t regs[64]={0,10,5,6};
+int8_t regs[64];
 int fetched = 0;
 int decoded = 0;
 int executed = 0;
