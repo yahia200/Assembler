@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <pthread.h>
 
 int8_t* operand1;
 int8_t* operand2;
@@ -12,32 +13,12 @@ int decoded = 0;
 int executed = 0;
 bool status[8];// 0=Zero, 1=Sign, 2=Negative, 3=Two’s Complement Overflow, 4=Carry
 uint16_t* PC=instMem;
-int8_t decodedOp[3];
-uint16_t IR;
+int8_t decodedBuffer[2][3];
+uint16_t fetchedBuffer[2];
 int cycle = 1;
 bool halt = false;
+pthread_t fetcher, decoder, executer;
 
-
-int main(){
-    init();
-    while(!halt){
-        printf("Cycle:  %d\n\n", cycle);
-        if(decoded > 0)
-            execute();
-        else
-            printf("No Instruction To Execute\n");
-        if(fetched > 0)
-            decode();
-        else
-            printf("No Instruction To Decode\n");
-        fetch();
-        endCycle();
-    }
-    end();
-
-
-    return 0;
-}
 
 
 void init(){
@@ -107,15 +88,25 @@ void addToInsMem(char splitLine[10][10], int c){
 
 
 void endCycle(){
+    pthread_join(executer, NULL);
+    pthread_join(decoder, NULL);
+    pthread_join(fetcher, NULL);
     cycle++;
+    shiftBuffers();
     println(150);
 }
 
+void shiftBuffers(){
+    fetchedBuffer[0] = fetchedBuffer[1];
+    fetchedBuffer[1] = 0;
+    decodedBuffer[0][0] = decodedBuffer[1][0];decodedBuffer[0][1] = decodedBuffer[1][1];decodedBuffer[0][2] = decodedBuffer[1][2];
+    decodedBuffer[1][0] = 0;decodedBuffer[1][1] = 0;decodedBuffer[1][2] = 0;
+}
 
 void fetch(){
     if(*PC!=62000){
-    IR = *PC;
-    printf("Fetched:  %d | Instruction: %d\n", ++fetched, IR);
+    fetchedBuffer[1] = *PC;
+    printf("Fetched:  %d | Instruction: %d\n", ++fetched, fetchedBuffer[1]);
     PC++;
     }
     else{
@@ -127,21 +118,21 @@ void fetch(){
 
 void decode(){
     printf("Decoded: %d | ", ++decoded);
-    decodedOp[0] = IR >> 12;
-    decodedOp[1] = (IR & 0x03f0) >> 6;
-    decodedOp[2] = (IR & 0x003f);
-    operand1 = regs + (decodedOp[1]);
-    operand2 = regs + (decodedOp[2]);
+    decodedBuffer[1][0] = fetchedBuffer[0] >> 12;
+    decodedBuffer[1][1] = (fetchedBuffer[0] & 0x03f0) >> 6;
+    decodedBuffer[1][2] = (fetchedBuffer[0] & 0x003f);
     
-    printf("OPCode: %d | First Operand: %d | Second Operand: %d\n", decodedOp[0], decodedOp[1], decodedOp[2]);
+    printf("OPCode: %d | First Operand: %d | Second Operand: %d\n", decodedBuffer[1][0], decodedBuffer[1][1], decodedBuffer[1][2]);
 
 
 }
 
 
 void execute(){
+    operand1 = regs + (decodedBuffer[0][1]);
+    operand2 = regs + (decodedBuffer[0][2]);
     printf("Executed: %d | ", ++executed);
-    int opCode = decodedOp[0];
+    int opCode = decodedBuffer[0][0];
     int imm;
     switch (opCode)
     {
@@ -185,7 +176,7 @@ void execute(){
         break;
 
     case 3://MOVI
-        imm = decodedOp[2];
+        imm = decodedBuffer[0][2];
         twosComp(&imm);
         printf("MOVI | REG[%d](%d) = IMM(%d) | ", (int)operand1 - (int)regs, *operand1, imm);
         printf("REG[%d] = ", (int)operand1 - (int)regs);
@@ -194,7 +185,7 @@ void execute(){
         break;
 
     case 4://BEQZ
-        imm = decodedOp[2];
+        imm = decodedBuffer[0][2];
         twosComp(&imm);
         if(*operand1 == 0){
             PC += imm;
@@ -204,7 +195,7 @@ void execute(){
         break;
 
     case 5://ANDI
-    imm = decodedOp[2];
+    imm = decodedBuffer[0][2];
     twosComp(&imm);
     printf("ANDI | REG[%d](%d) &= IMM(%d) | ", (int)operand1 - (int)regs, *operand1, imm);
     printf("REG[%d] = ", (int)operand1 - (int)regs);
@@ -215,7 +206,7 @@ void execute(){
         break;
 
     case 6://EOR
-    imm = decodedOp[2];
+    imm = decodedBuffer[0][2];
     twosComp(&imm);
     printf("EOR | REG[%d](%d) ^= IMM(%d) | ", (int)operand1 - (int)regs, *operand1, imm);
     printf("REG[%d] = ", (int)operand1 - (int)regs);
@@ -234,7 +225,7 @@ void execute(){
         break;
     
     case 8://SAL
-        imm = decodedOp[2];
+        imm = decodedBuffer[0][2];
         twosComp(&imm);
         printf("SAL | REG[%d](%d) <<= IMM(%d) | ", (int)operand1 - (int)regs, *operand1, imm);
         printf("REG[%d] = ", (int)operand1 - (int)regs);
@@ -245,7 +236,7 @@ void execute(){
         break;
 
     case 9://SAR
-        imm = decodedOp[2];
+        imm = decodedBuffer[0][2];
         twosComp(&imm);
         printf("SAL | REG[%d](%d) >>= IMM(%d) | ", (int)operand1 - (int)regs, *operand1, imm);
         printf("REG[%d] = ", (int)operand1 - (int)regs);
@@ -256,7 +247,7 @@ void execute(){
         break;
 
     case 10://LDR
-        operand2 = &datatMem[0] + (decodedOp[2]);
+        operand2 = &datatMem[0] + (decodedBuffer[0][2]);
         printf("LDR | REG[%d](%d) = MEM[%d](%d) | ", (int)operand1 - (int)regs, *operand1, (int)operand2 - (int)datatMem, *operand2);
         printf("REG[%d] = ", (int)operand1 - (int)regs);
         *operand1 = *operand2;
@@ -265,7 +256,7 @@ void execute(){
     
 
     case 11://STR
-        operand2 = &datatMem[0] + (decodedOp[2]);
+        operand2 = &datatMem[0] + (decodedBuffer[0][2]);
         printf("STR | MEM[%d](%d) = REG[%d](%d) | ", (int)operand2 - (int)datatMem, *operand2, (int)operand1 - (int)regs, *operand1);
         printf("MEM[%d] = ", (int)operand2 - (int)datatMem);
         *operand2 = *operand1;
@@ -334,6 +325,28 @@ void println(int x){
     for (int i = 0; i< x ;i++)
         printf("―");
     printf("\n\n");
+}
+
+
+int main(){
+    init();
+    while(!halt){
+        printf("Cycle:  %d\n\n", cycle);
+        if(decoded > 0)
+        pthread_create(&executer, NULL, &execute, NULL);
+        else
+            printf("No Instruction To Execute\n");
+        if(fetchedBuffer[0]!=0 || fetched>0)
+            pthread_create(&decoder, NULL, &decode, NULL);
+        else
+            printf("No Instruction To Decode\n");
+        pthread_create(&fetcher, NULL, &fetch, NULL);
+        endCycle();
+    }
+    end();
+
+
+    return 0;
 }
 
 
