@@ -336,7 +336,7 @@ int main(){
         pthread_create(&executer, NULL, &execute, NULL);
         else
             printf("No Instruction To Execute\n");
-        if(fetchedBuffer[0]!=0 || fetched>0)
+        if(fetched>0)
             pthread_create(&decoder, NULL, &decode, NULL);
         else
             printf("No Instruction To Decode\n");
