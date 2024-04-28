@@ -281,12 +281,9 @@ void execute(){
 
 void twosComp(int8_t* num){
     const int negative = (*num & (1 << 5)) != 0;
-    int nativeInt;
 
 if (negative)
   *num |= 0xFFFFFFC0;
-else
-  nativeInt = num;
 }
 
 
@@ -300,6 +297,7 @@ void printStatus(){
 void end(){
     printf("Cycle:  %d\n\n", cycle);
     execute();
+    printf("No Instruction To Decode\n");
     println(300);
     printRegs();
     println(300);
