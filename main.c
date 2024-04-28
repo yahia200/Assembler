@@ -24,8 +24,12 @@ int main(){
         printf("Cycle:  %d\n\n", cycle);
         if(decoded > 0)
             execute();
+        else
+            printf("No Instruction To Execute\n");
         if(fetched > 0)
             decode();
+        else
+            printf("No Instruction To Decode\n");
         fetch();
         endCycle();
     }
@@ -111,16 +115,18 @@ void endCycle(){
 void fetch(){
     if(*PC!=62000){
     IR = *PC;
-    printf("Fetching:  %d | Instruction: %d\n", ++fetched, IR);
+    printf("Fetched:  %d | Instruction: %d\n", ++fetched, IR);
     PC++;
     }
-    else
+    else{
         halt = true;
+        printf("No Instruction TO Fetch\n");
+    }
 }
 
 
 void decode(){
-    printf("Decodinging: %d | ", ++decoded);
+    printf("Decoded: %d | ", ++decoded);
     decodedOp[0] = IR >> 12;
     decodedOp[1] = (IR & 0x03f0) >> 6;
     decodedOp[2] = (IR & 0x003f);
@@ -134,7 +140,7 @@ void decode(){
 
 
 void execute(){
-    printf("Executing: %d | ", ++executed);
+    printf("Executed: %d | ", ++executed);
     int opCode = decodedOp[0];
     int imm;
     switch (opCode)
