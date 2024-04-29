@@ -13,8 +13,8 @@ int decoded = 0;
 int executed = 0;
 bool status[8];// 0=Zero, 1=Sign, 2=Negative, 3=Two’s Complement Overflow, 4=Carry
 uint16_t* PC=instMem;
-int8_t decodedBuffer[2][3];
-uint16_t fetchedBuffer[2];
+int8_t decodedBuffer[2][3] = {{-1},{-1}};
+uint16_t fetchedBuffer[2] = {-1, -1};
 int cycle = 1;
 bool halt = false;
 pthread_t fetcher, decoder, executer;
@@ -350,11 +350,11 @@ int main(){
     init();
     while(!halt){
         startCycle();
-        if(decoded > 0)
-        pthread_create(&executer, NULL, &execute, NULL);
+        if(decodedBuffer[0][0] != -1)
+            pthread_create(&executer, NULL, &execute, NULL);
         else
             printf("No Instruction To Execute\n");
-        if(fetched>0)
+        if((int16_t)fetchedBuffer[0] != -1)
             pthread_create(&decoder, NULL, &decode, NULL);
         else
             printf("No Instruction To Decode\n");
