@@ -18,6 +18,7 @@ uint16_t fetchedBuffer[2];
 int cycle = 1;
 bool halt = false;
 pthread_t fetcher, decoder, executer;
+int DEBUG = -1;
 
 
 
@@ -39,6 +40,11 @@ void init(){
     instMem[c] = 62000;
 
     fclose(file);
+    printf("Please Select Mode.\n0: run code.\n1: debug each cycle.\n");
+    while(DEBUG < 0 || DEBUG > 1){
+        printf("Mode: ");
+        scanf("%d", &DEBUG);
+    }
 }
 
 
@@ -328,10 +334,22 @@ void println(int x){
 }
 
 
+
+
+void startCycle(){
+    char c;
+    if(DEBUG){
+        printf("Press Enter To Step Forward");
+        scanf("%c", &c);
+    }
+    printf("Cycle:  %d\n\n", cycle);
+}
+
+
 int main(){
     init();
     while(!halt){
-        printf("Cycle:  %d\n\n", cycle);
+        startCycle();
         if(decoded > 0)
         pthread_create(&executer, NULL, &execute, NULL);
         else
