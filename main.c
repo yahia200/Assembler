@@ -2,6 +2,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <pthread.h>
+#include <unistd.h>
+#include "resources/func.h"
 
 int8_t* operand1;
 int8_t* operand2;
@@ -19,6 +21,9 @@ int cycle = 1;
 bool halt = false;
 pthread_t fetcher, decoder, executer;
 int DEBUG = -1;
+
+
+
 
 
 
@@ -43,26 +48,8 @@ void init(){
     printf("Please Select Mode.\n0: run code.\n1: debug each cycle.\n");
     while(DEBUG < 0 || DEBUG > 1){
         printf("Mode: ");
-        scanf("%d", &DEBUG);
-    }
-}
-
-
-void split(char str1[], char splitLine[10][10]){
-    int i, j, ctr;
-
-    j = 0;
-    ctr = 0;
-
-    for (i = 0; i <= (strlen(str1)); i++) {
-        if (str1[i] == ' ' || str1[i] == '\0') {
-            splitLine[ctr][j] = '\0';
-            ctr++;
-            j = 0;
-        } else {
-            splitLine[ctr][j] = str1[i];
-            j++;
-        }
+        DEBUG = getch() - '0';
+        printf("\n");
     }
 }
 
@@ -102,12 +89,14 @@ void endCycle(){
     println(150);
 }
 
+
 void shiftBuffers(){
     fetchedBuffer[0] = fetchedBuffer[1];
     fetchedBuffer[1] = 0;
     decodedBuffer[0][0] = decodedBuffer[1][0];decodedBuffer[0][1] = decodedBuffer[1][1];decodedBuffer[0][2] = decodedBuffer[1][2];
     decodedBuffer[1][0] = 0;decodedBuffer[1][1] = 0;decodedBuffer[1][2] = 0;
 }
+
 
 void fetch(){
     if(*PC!=62000){
@@ -276,14 +265,6 @@ void execute(){
 }
 
 
-void twosComp(int8_t* num){
-    const int negative = (*num & (1 << 5)) != 0;
-
-if (negative)
-  *num |= 0xFFFFFFC0;
-}
-
-
 void printStatus(){
     for(int i=0;i<8;i++){
         printf("%d:  %d  |  ", i, status[i]);
@@ -326,21 +307,11 @@ void printInsMem(){
 }
 
 
-void println(int x){
-    printf("\n\n");
-    for (int i = 0; i< x ;i++)
-        printf("―");
-    printf("\n\n");
-}
-
-
-
-
 void startCycle(){
     char c;
     if(DEBUG){
-        printf("Press Enter To Step Forward");
-        scanf("%c", &c);
+        printf("Press Any Boutton To Step Forward\n");
+        getch();
     }
     printf("Cycle:  %d\n\n", cycle);
 }

@@ -1,7 +1,8 @@
 {
     "cmake.sourceDirectory": "/home/yahiaunix/CA/CA",
     "files.associations": {
-        "pthread.h": "c"
+        "pthread.h": "c",
+        "func.h": "c"
     },
     "C_Cpp.errorSquiggles": "disabled"
 }
