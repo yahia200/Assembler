@@ -209,7 +209,6 @@ void execute(){
         break;
 
     case 4://BEQZ
-        printf("BRANNNNNNNNNNNNCH\n");
         if(*operand1 == 0){
             dPC = PC;
             PC = xPC + imm;
@@ -218,7 +217,7 @@ void execute(){
             clearBuffers();
             break;
         }
-        printf("BEQZ | NO BRANCHING");
+        printf("BEQZ | NO BRANCHING | REG = %d", *operand1);
         break;
 
     case 5://ANDI
