@@ -49,3 +49,12 @@ void split(char str1[], char splitLine[10][10]){
         }
     }
 }
+
+int strcicmp(char const *a, char const *b)
+{
+    for (;; a++, b++) {
+        int d = tolower((unsigned char)*a) - tolower((unsigned char)*b);
+        if (d != 0 || !*a)
+            return d;
+    }
+}

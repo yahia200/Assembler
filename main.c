@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <ctype.h>
 #include "resources/func.h"
 
 int8_t* operand1;
@@ -26,25 +27,27 @@ int DEBUG = -1;
 
 
 
-
+// Parse code to Instructions and add it to Instruction Memory and select if in DEBUG mode
 void init(){
-    char splitLine[10][10];
-    char const* const fileName = "code.txt"; /* should check that argc > 1 */
-    FILE* file = fopen(fileName, "r"); /* should check the result */
+    char splitLine[3][10];
+    char const* const fileName = "code.txt";
+    FILE* file = fopen(fileName, "r");
     char line[256];
-    int c = 0;
+    int c = 0;// Number of parsed instructions
 
-    while (fgets(line, sizeof(line), file)) {
-        split(line, splitLine);
-        addToInsMem(splitLine, c);
+
+    while (fgets(line, sizeof(line), file)) {// While the Assembly code has lines
+        split(line, splitLine);// Split Code Line into [OPCode, Operand 1, Operand 2] and put it in the splitLine Array
+        addToInsMem(splitLine, c);// Add parsed Instruction to Memory and increment c
         c++;
         
 
         
     }
-    instMem[c] = 62000;
+    instMem[c] = 62000;// Finaly add the Halt instruction which is used to know the end of the program
 
     fclose(file);
+
     printf("Please Select Mode.\n0: run code.\n1: debug each cycle.\n");
     while(DEBUG < 0 || DEBUG > 1){
         printf("Mode: ");
@@ -53,33 +56,54 @@ void init(){
     }
 }
 
-
+// Turn Instruction name into OPCode
 int parseOP(char OP[10]){
     char OPs[12][10] = {"ADD","SUB", "MUL", "MOVI", "BEQZ", "ANDI", "EOR", "BR", "SAL", "SAR", "LDR", "STR"};
 
     for (int i = 0; i < 12; i++){
-        if(strcmp(OP, OPs[i]) == 0)
-            return (int)i;
+        if(strcicmp(OP, OPs[i]) == 0)// Compare input to possible instructions ignoring case
+            return (int)i;//return index of instruction which is equivalent to its OPCode
     }
+     printf("Unrecognized Instruction: %s\n", OP);//Check wrong Spelling
+     exit(-1);
+
 }
 
 
+// Turn Operands from text into int
 int parseOperand(char OP[10]){
-    uintmax_t num = strtoumax(OP, NULL, 10);
-    
+    for(int i=0; i<1;i++){// Check if entered value wasn't int
+        if (i == 0 && OP[i] == '-')
+            continue;
+        else if (isdigit(OP[i]) == 0 && OP[i]){
+            printf("Unrecognized Operand: %s\n", OP);
+            exit(-1);
+        }
+    }
+
+    int num = atoi(OP);
 }
 
-
-void addToInsMem(char splitLine[10][10], int c){
+// Populate the Instruction Memory
+void addToInsMem(char splitLine[3][10], int c){
         int16_t OP = parseOP(splitLine[0]);
         int16_t operand1 = parseOperand(splitLine[1]);
+        if (operand1 > 63 || operand1 < 0){// Check REG index
+            printf("Register Range From (0-63) Can't Be: %d\n", operand1);
+            exit(-1);
+        }
+
         int16_t operand2 = parseOperand(splitLine[2]);
+        if((uint16_t)operand2 > 127){// Check operand size
+            printf("Operans Consist Of Only 6 BITS Can't Be: %d\n", operand1);
+            exit(-1);
+        }
         uint16_t ins = (OP<<12) | (operand1<<6) | (operand2);
         instMem[c] = ins;
 
 }
 
-
+ 
 void endCycle(){
     pthread_join(executer, NULL);
     pthread_join(decoder, NULL);
@@ -89,7 +113,7 @@ void endCycle(){
     println(150);
 }
 
-
+// Shift buffer data so the newly fetched/decoded instruction can be decoded/executed
 void shiftBuffers(){
     fetchedBuffer[0] = fetchedBuffer[1];
     fetchedBuffer[1] = 0;
@@ -97,7 +121,7 @@ void shiftBuffers(){
     decodedBuffer[1][0] = 0;decodedBuffer[1][1] = 0;decodedBuffer[1][2] = 0;
 }
 
-
+// Puts the instruction in fetched buffer and increments PC
 void fetch(){
     if(*PC!=62000){
     fetchedBuffer[1] = *PC;
@@ -110,7 +134,7 @@ void fetch(){
     }
 }
 
-
+// Splits instruction into [OPCode, Operand 1, Operand 2] by shifting and masking the instruction then puts in decoded Buffer
 void decode(){
     printf("Decoded: %d | ", ++decoded);
     decodedBuffer[1][0] = fetchedBuffer[0] >> 12;
@@ -122,7 +146,7 @@ void decode(){
 
 }
 
-
+// fetches decoded instruction from decoded buffer then using a Switch to select which operation to execute then executing it
 void execute(){
     operand1 = regs + (decodedBuffer[0][1]);
     operand2 = regs + (decodedBuffer[0][2]);
@@ -264,14 +288,14 @@ void execute(){
     
 }
 
-
+// prints the SREG
 void printStatus(){
     for(int i=0;i<8;i++){
         printf("%d:  %d  |  ", i, status[i]);
     }
 }
 
-
+// Prints the whole Memory and REGs
 void end(){
     printf("Cycle:  %d\n\n", cycle);
     execute();
@@ -285,7 +309,7 @@ void end(){
     println(300);
 }
 
-
+// Prints REGs
 void printRegs(){
 
     for(int i = 0; i<64; i++)
@@ -294,19 +318,19 @@ void printRegs(){
     printStatus();
 }
 
-
+// Prints DATA MEMORY
 void printDataMem(){
     for(int i = 0; i<2048; i++)
         printf("DATA[%d]: %d | ", i, (int8_t)*(datatMem+i));
 }
 
-
+// Prints INS MEMORY
 void printInsMem(){
     for(int i = 0; i<1024; i++)
         printf("INS[%d]: %d | ", i, (uint16_t)*(instMem+i));
 }
 
-
+// Handles Debuging at the start of a cycle
 void startCycle(){
     char c;
     if(DEBUG){
@@ -316,7 +340,7 @@ void startCycle(){
     printf("Cycle:  %d\n\n", cycle);
 }
 
-
+// Main program Flow
 int main(){
     init();
     while(!halt){
