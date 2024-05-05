@@ -21,6 +21,7 @@ int cycle = 1;
 pthread_t fetcher, decoder, executer;
 int DEBUG = -1;
 bool halt = false;
+long maxiter = 2000;// max number of Cycles befor the program automatically halts to avoid infinite loops
 
 
 
@@ -89,12 +90,11 @@ int parseOperand(char OP[10]){
 void addToInsMem(char splitLine[3][10], int c){
         int16_t OP = parseOP(splitLine[0]);
         int16_t operand1 = parseOperand(splitLine[1]);
-        operand1 &= 0x003f;
         if (operand1 > 63 || operand1 < 0){// Check REG index
             printf("Register Range From (0-63) Can't Be: %d\n", operand1);
             exit(-1);
         }
-
+        operand1 &= 0x003f;
         int16_t operand2 = parseOperand(splitLine[2]);
         operand2 &= 0x003f;
         if((uint16_t)operand2 & 0x003f > 127){// Check operand size
@@ -300,6 +300,9 @@ void printStatus(){
 
 // Prints the whole Memory and REGs
 void end(){
+    if ( cycle >= maxiter)
+        printf("terminated due to loop\n");
+    else{
     printf("Cycle:  %d\n\n", cycle);
     execute();
     printf("No Instruction To Decode\n");
@@ -310,6 +313,7 @@ void end(){
     println(300);
     printInsMem();
     println(300);
+}
 }
 
 // Prints REGs
@@ -356,7 +360,7 @@ void clearBuffers(){
 // Main program Flow
 int main(){
     init();
-    while(!halt){
+    while(!halt && cycle < maxiter){
         startCycle();
 
         pthread_create(&fetcher, NULL, &fetch, NULL);
