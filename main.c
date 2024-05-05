@@ -8,20 +8,19 @@
 
 int8_t* operand1;
 int8_t* operand2;
-uint16_t instMem[1024];//halt = 62000
+uint16_t instMem[1024];
 int8_t datatMem[2048]={7, 5};
 int8_t regs[64];
-int fetched = 0;
-int decoded = 0;
-int executed = 0;
 bool status[8];// 0=Zero, 1=Sign, 2=Negative, 3=Two’s Complement Overflow, 4=Carry
 uint16_t* PC=instMem;
 int8_t decodedBuffer[2][3] = {{-1},{-1}};
 uint16_t fetchedBuffer[2] = {-1, -1};
+uint16_t* xPC;// PC of next instruction to be executed
+uint16_t* dPC;// PC of next instruction to be executed
 int cycle = 1;
-bool halt = false;
 pthread_t fetcher, decoder, executer;
 int DEBUG = -1;
+bool halt = false;
 
 
 
@@ -29,11 +28,14 @@ int DEBUG = -1;
 
 // Parse code to Instructions and add it to Instruction Memory and select if in DEBUG mode
 void init(){
+    xPC = PC;
+    dPC = PC;
     char splitLine[3][10];
     char const* const fileName = "code.txt";
     FILE* file = fopen(fileName, "r");
     char line[256];
     int c = 0;// Number of parsed instructions
+    initIns(instMem);
 
 
     while (fgets(line, sizeof(line), file)) {// While the Assembly code has lines
@@ -80,22 +82,23 @@ int parseOperand(char OP[10]){
             exit(-1);
         }
     }
-
-    int num = atoi(OP);
+    return atoi(OP);
 }
 
 // Populate the Instruction Memory
 void addToInsMem(char splitLine[3][10], int c){
         int16_t OP = parseOP(splitLine[0]);
         int16_t operand1 = parseOperand(splitLine[1]);
+        operand1 &= 0x003f;
         if (operand1 > 63 || operand1 < 0){// Check REG index
             printf("Register Range From (0-63) Can't Be: %d\n", operand1);
             exit(-1);
         }
 
         int16_t operand2 = parseOperand(splitLine[2]);
-        if((uint16_t)operand2 > 127){// Check operand size
-            printf("Operans Consist Of Only 6 BITS Can't Be: %d\n", operand1);
+        operand2 &= 0x003f;
+        if((uint16_t)operand2 & 0x003f > 127){// Check operand size
+            printf("Operands Consist Of Only 6 BITS Can't Be: %d\n", operand1);
             exit(-1);
         }
         uint16_t ins = (OP<<12) | (operand1<<6) | (operand2);
@@ -111,32 +114,34 @@ void endCycle(){
     cycle++;
     shiftBuffers();
     println(150);
+    if(*xPC == 62000)
+        halt = true;
 }
 
 // Shift buffer data so the newly fetched/decoded instruction can be decoded/executed
 void shiftBuffers(){
     fetchedBuffer[0] = fetchedBuffer[1];
-    fetchedBuffer[1] = 0;
+    fetchedBuffer[1] = -1;
     decodedBuffer[0][0] = decodedBuffer[1][0];decodedBuffer[0][1] = decodedBuffer[1][1];decodedBuffer[0][2] = decodedBuffer[1][2];
-    decodedBuffer[1][0] = 0;decodedBuffer[1][1] = 0;decodedBuffer[1][2] = 0;
+    decodedBuffer[1][0] = -1;decodedBuffer[1][1] = -1;decodedBuffer[1][2] = -1;
 }
 
 // Puts the instruction in fetched buffer and increments PC
 void fetch(){
-    if(*PC!=62000){
+    if(*PC != 62000){
     fetchedBuffer[1] = *PC;
-    printf("Fetched:  %d | Instruction: %d\n", ++fetched, fetchedBuffer[1]);
+    printf("Fetched:  %d | Instruction: %d\n", (PC - instMem) + 1, fetchedBuffer[1]);
+    dPC = PC;
     PC++;
     }
     else{
-        halt = true;
         printf("No Instruction TO Fetch\n");
     }
 }
 
 // Splits instruction into [OPCode, Operand 1, Operand 2] by shifting and masking the instruction then puts in decoded Buffer
 void decode(){
-    printf("Decoded: %d | ", ++decoded);
+    printf("Decoded: %d | ", dPC - instMem);
     decodedBuffer[1][0] = fetchedBuffer[0] >> 12;
     decodedBuffer[1][1] = (fetchedBuffer[0] & 0x03f0) >> 6;
     decodedBuffer[1][2] = (fetchedBuffer[0] & 0x003f);
@@ -148,11 +153,13 @@ void decode(){
 
 // fetches decoded instruction from decoded buffer then using a Switch to select which operation to execute then executing it
 void execute(){
+    xPC++;
     operand1 = regs + (decodedBuffer[0][1]);
     operand2 = regs + (decodedBuffer[0][2]);
-    printf("Executed: %d | ", ++executed);
+    printf("Executed: %d | ", xPC - instMem);
     int opCode = decodedBuffer[0][0];
-    int imm;
+    int8_t imm = decodedBuffer[0][2];
+    twosComp(&imm);
     switch (opCode)
     {
     case 0://ADD
@@ -195,8 +202,6 @@ void execute(){
         break;
 
     case 3://MOVI
-        imm = decodedBuffer[0][2];
-        twosComp(&imm);
         printf("MOVI | REG[%d](%d) = IMM(%d) | ", (int)operand1 - (int)regs, *operand1, imm);
         printf("REG[%d] = ", (int)operand1 - (int)regs);
         *operand1 = imm;
@@ -204,18 +209,19 @@ void execute(){
         break;
 
     case 4://BEQZ
-        imm = decodedBuffer[0][2];
-        twosComp(&imm);
+        printf("BRANNNNNNNNNNNNCH\n");
         if(*operand1 == 0){
-            PC += imm;
-            printf("BEQZ | BRANCHING TO: %d", PC);
+            dPC = PC;
+            PC = xPC + imm;
+            xPC+= imm;
+            printf("BEQZ | BRANCHING TO: %d\n", (PC - instMem) + 1);
+            clearBuffers();
+            break;
         }
         printf("BEQZ | NO BRANCHING");
         break;
 
     case 5://ANDI
-    imm = decodedBuffer[0][2];
-    twosComp(&imm);
     printf("ANDI | REG[%d](%d) &= IMM(%d) | ", (int)operand1 - (int)regs, *operand1, imm);
     printf("REG[%d] = ", (int)operand1 - (int)regs);
     *operand1 &= imm;
@@ -225,8 +231,6 @@ void execute(){
         break;
 
     case 6://EOR
-    imm = decodedBuffer[0][2];
-    twosComp(&imm);
     printf("EOR | REG[%d](%d) ^= IMM(%d) | ", (int)operand1 - (int)regs, *operand1, imm);
     printf("REG[%d] = ", (int)operand1 - (int)regs);
     *operand1 ^= imm;
@@ -240,12 +244,13 @@ void execute(){
         int16_t target = (*operand1<<8);
         target |= *operand2;
         printf("BR | BRANCHING TO: %d = %d || %d", target, *operand1, *operand2);
+        dPC = PC;
         PC = target;
+        xPC = PC;
+        clearBuffers();
         break;
     
     case 8://SAL
-        imm = decodedBuffer[0][2];
-        twosComp(&imm);
         printf("SAL | REG[%d](%d) <<= IMM(%d) | ", (int)operand1 - (int)regs, *operand1, imm);
         printf("REG[%d] = ", (int)operand1 - (int)regs);
         *operand1 <<= imm;
@@ -255,8 +260,6 @@ void execute(){
         break;
 
     case 9://SAR
-        imm = decodedBuffer[0][2];
-        twosComp(&imm);
         printf("SAL | REG[%d](%d) >>= IMM(%d) | ", (int)operand1 - (int)regs, *operand1, imm);
         printf("REG[%d] = ", (int)operand1 - (int)regs);
         *operand1 >>= imm;
@@ -285,6 +288,7 @@ void execute(){
     default:
         break;
     }
+    printf("| %d\n", decodedBuffer[0][0]); 
     
 }
 
@@ -337,7 +341,17 @@ void startCycle(){
         printf("Press Any Boutton To Step Forward\n");
         getch();
     }
+    printf("PC: %p\n", PC);
     printf("Cycle:  %d\n\n", cycle);
+}
+
+
+void clearBuffers(){
+    for(int i=0; i<2; i++){
+        fetchedBuffer[i] = -1;
+        for (int j =0;j<3;j++)
+            decodedBuffer[i][j] = -1;
+    }
 }
 
 // Main program Flow
@@ -345,15 +359,18 @@ int main(){
     init();
     while(!halt){
         startCycle();
-        if(decodedBuffer[0][0] != -1)
-            pthread_create(&executer, NULL, &execute, NULL);
-        else
-            printf("No Instruction To Execute\n");
+
+        pthread_create(&fetcher, NULL, &fetch, NULL);
+
         if((int16_t)fetchedBuffer[0] != -1)
             pthread_create(&decoder, NULL, &decode, NULL);
         else
             printf("No Instruction To Decode\n");
-        pthread_create(&fetcher, NULL, &fetch, NULL);
+        
+        if(decodedBuffer[0][0] != -1)
+            pthread_create(&executer, NULL, &execute, NULL);
+        else
+            printf("No Instruction To Execute\n");
         endCycle();
     }
     end();

@@ -32,7 +32,7 @@ void println(int x){
     printf("\n\n");
 }
 
-void split(char str1[], char splitLine[10][10]){
+void split(char str1[], char splitLine[3][10]){
     int i, j, ctr;
 
     j = 0;
@@ -44,6 +44,8 @@ void split(char str1[], char splitLine[10][10]){
             ctr++;
             j = 0;
         } else {
+            if(ctr > 0 && str1[i] == 'R')
+                continue;
             splitLine[ctr][j] = str1[i];
             j++;
         }
@@ -56,5 +58,12 @@ int strcicmp(char const *a, char const *b)
         int d = tolower((unsigned char)*a) - tolower((unsigned char)*b);
         if (d != 0 || !*a)
             return d;
+    }
+}
+
+
+void initIns(uint16_t* instMem){
+    for (int i=0;i<1024;i++){
+        instMem[i] = 62000;
     }
 }
