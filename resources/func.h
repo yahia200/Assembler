@@ -4,6 +4,7 @@
 #include <pthread.h>
 #include <termios.h>
 #include <unistd.h>
+#include <limits.h>
 
 int getch(void)
 {
@@ -66,4 +67,28 @@ void initIns(uint16_t* instMem){
     for (int i=0;i<1024;i++){
         instMem[i] = 62000;
     }
+}
+
+
+void clearLine(char splitLine[3][10]){
+    for (int i=0;i<3;i++){
+        for (int j=0;j<10;j++){
+            splitLine[i][j] = '^';
+    }
+    }
+}
+
+int isInt(char i){
+    return (i >= '0' && i <= '9');
+}
+
+int intob(uint16_t n)
+{
+    char b[(sizeof n * CHAR_BIT) + 1];
+    char *p = b + sizeof b;
+    *--p = '\0';
+    for (; p-- > b;  n >>= 1) {
+        *p = '0' + (char)(n & 1);
+    }
+    return puts(b);
 }

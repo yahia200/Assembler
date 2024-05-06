@@ -13,15 +13,16 @@ int8_t datatMem[2048]={7, 5};
 int8_t regs[64];
 bool status[8];// 0=Zero, 1=Sign, 2=Negative, 3=Two’s Complement Overflow, 4=Carry
 uint16_t* PC=instMem;
-int8_t decodedBuffer[2][3] = {{-1},{-1}};
+uint8_t decodedBuffer[2][3] = {{-1},{-1}};
 uint16_t fetchedBuffer[2] = {-1, -1};
 uint16_t* xPC;// PC of next instruction to be executed
-uint16_t* dPC;// PC of next instruction to be executed
+uint16_t* dPC;// PC of next instruction to be decoded
 int cycle = 1;
 pthread_t fetcher, decoder, executer;
 int DEBUG = -1;
 bool halt = false;
 long maxiter = 2000;// max number of Cycles befor the program automatically halts to avoid infinite loops
+int c = 1;// Number of parsed instructions
 
 
 
@@ -35,19 +36,18 @@ void init(){
     char const* const fileName = "code.txt";
     FILE* file = fopen(fileName, "r");
     char line[256];
-    int c = 0;// Number of parsed instructions
     initIns(instMem);
 
 
     while (fgets(line, sizeof(line), file)) {// While the Assembly code has lines
+        //clearLine(splitLine);
         split(line, splitLine);// Split Code Line into [OPCode, Operand 1, Operand 2] and put it in the splitLine Array
-        addToInsMem(splitLine, c);// Add parsed Instruction to Memory and increment c
+        addToInsMem(splitLine, c-1);// Add parsed Instruction to Memory and increment c
         c++;
         
 
         
     }
-    instMem[c] = 62000;// Finaly add the Halt instruction which is used to know the end of the program
 
     fclose(file);
 
@@ -75,11 +75,11 @@ int parseOP(char OP[10]){
 
 // Turn Operands from text into int
 int parseOperand(char OP[10]){
-    for(int i=0; i<1;i++){// Check if entered value wasn't int
+    for(int i=0; i<10;i++){// Check if entered value wasn't int
         if (i == 0 && OP[i] == '-')
             continue;
-        else if (isdigit(OP[i]) == 0 && OP[i]){
-            printf("Unrecognized Operand: %s\n", OP);
+        else if (!isInt(OP[i]) && OP[i] > 31){
+            printf("Unrecognized Operand: %s ON LINE: %d\n", OP, c);
             exit(-1);
         }
     }
@@ -88,16 +88,16 @@ int parseOperand(char OP[10]){
 
 // Populate the Instruction Memory
 void addToInsMem(char splitLine[3][10], int c){
-        int16_t OP = parseOP(splitLine[0]);
-        int16_t operand1 = parseOperand(splitLine[1]);
+        int8_t OP = parseOP(splitLine[0]);
+        uint8_t operand1 = parseOperand(splitLine[1]);
         if (operand1 > 63 || operand1 < 0){// Check REG index
-            printf("Register Range From (0-63) Can't Be: %d\n", operand1);
+            printf("Register Range From (0-63) Can't Be: %d ON LINE: %d\n", (int8_t)operand1, c);
             exit(-1);
         }
         operand1 &= 0x003f;
-        int16_t operand2 = parseOperand(splitLine[2]);
+        int8_t operand2 = parseOperand(splitLine[2]);
         operand2 &= 0x003f;
-        if((uint16_t)operand2 & 0x003f > 127){// Check operand size
+        if((uint8_t)operand2 & 0x003f > 127){// Check operand size
             printf("Operands Consist Of Only 6 BITS Can't Be: %d\n", operand1);
             exit(-1);
         }
@@ -128,10 +128,11 @@ void shiftBuffers(){
 
 // Puts the instruction in fetched buffer and increments PC
 void fetch(){
+    dPC = PC;
     if(*PC != 62000){
     fetchedBuffer[1] = *PC;
-    printf("Fetched:  %d | Instruction: %d\n", (PC - instMem) + 1, fetchedBuffer[1]);
-    dPC = PC;
+    printf("Fetched:  %d | Instruction: ", (PC - instMem) + 1);
+    intob(fetchedBuffer[1]);
     PC++;
     }
     else{
@@ -143,8 +144,8 @@ void fetch(){
 void decode(){
     printf("Decoded: %d | ", dPC - instMem);
     decodedBuffer[1][0] = fetchedBuffer[0] >> 12;
-    decodedBuffer[1][1] = (fetchedBuffer[0] & 0x03f0) >> 6;
-    decodedBuffer[1][2] = (fetchedBuffer[0] & 0x003f);
+    decodedBuffer[1][1] = (fetchedBuffer[0] & 0xfc0) >> 6;
+    decodedBuffer[1][2] = (fetchedBuffer[0] & 0x3f);
     
     printf("OPCode: %d | First Operand: %d | Second Operand: %d\n", decodedBuffer[1][0], decodedBuffer[1][1], decodedBuffer[1][2]);
 
@@ -287,7 +288,6 @@ void execute(){
     default:
         break;
     }
-    printf("| %d\n", decodedBuffer[0][0]); 
     
 }
 
@@ -370,15 +370,13 @@ int main(){
         else
             printf("No Instruction To Decode\n");
         
-        if(decodedBuffer[0][0] != -1)
+        if((int8_t)decodedBuffer[0][0] != -1)
             pthread_create(&executer, NULL, &execute, NULL);
         else
             printf("No Instruction To Execute\n");
         endCycle();
     }
     end();
-
-
     return 0;
 }
 
