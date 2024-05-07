@@ -23,6 +23,7 @@ uint16_t* dPC;// PC of next instruction to be decoded
 int8_t imm;
 int cycle = 1;
 pthread_t fetcher, decoder, executer;
+bool immIns;
 int DEBUG = -1;
 bool halt = false;
 long maxiter = 2000;// max number of Cycles befor the program automatically halts to avoid infinite loops
@@ -44,7 +45,6 @@ void init(){
 
 
     while (fgets(line, sizeof(line), file)) {// While the Assembly code has lines
-        printf("%d\n", *line);
         if(line[0] > 32){
         split(line, splitLine);// Split Code Line into [OPCode, Operand 1, Operand 2] and put it in the splitLine Array
         addToInsMem(splitLine, c-1);// Add parsed Instruction to Memory and increment c
@@ -70,8 +70,13 @@ int parseOP(char OP[10]){
     char OPs[12][10] = {"ADD","SUB", "MUL", "MOVI", "BEQZ", "ANDI", "EOR", "BR", "SAL", "SAR", "LDR", "STR"};
 
     for (int i = 0; i < 12; i++){
-        if(strcicmp(OP, OPs[i]) == 0)// Compare input to possible instructions ignoring case
+        if(strcicmp(OP, OPs[i]) == 0){// Compare input to possible instructions ignoring case
+            if((i>=3 && i<=5) || i == 8 || i == 9)
+                immIns = 1;
+            else
+                immIns = 0;
             return (int)i;//return index of instruction which is equivalent to its OPCode
+        }    
     }
      printf("Unrecognized Instruction: %s ON LINE: %d\n", OP, c);//Check wrong Spelling
      exit(-1);
@@ -82,8 +87,15 @@ int parseOP(char OP[10]){
 // Turn Operands from text into int
 int parseOperand(char OP[10]){
     for(int i=0; i<10;i++){// Check if entered value wasn't int
-        if (i == 0 && OP[i] == '-')
-            continue;
+        if (i == 0 && OP[i] == '-'){
+            if(!immIns){
+                printf("Operand Cant Be Negative For This Instruction: %s ON LINE: %d\n", OP, c);
+                exit(-1);
+            }
+            else
+                continue;
+
+        }
         else if (!isInt(OP[i]) && OP[i] > 32){
             printf("Unrecognized Operand: %s ON LINE: %d\n", OP, c);
             exit(-1);
@@ -120,7 +132,7 @@ void endCycle(){
     cycle++;
     shiftBuffers();
     println(150);
-    if(*xPC == 62000)
+    if(*xPC == (uint16_t)-1)
         halt = true;
 }
 
@@ -135,7 +147,7 @@ void shiftBuffers(){
 // Puts the instruction in fetched buffer and increments PC
 void fetch(){
     dPC = PC;
-    if(*PC != 62000){
+    if(*PC != (uint16_t)-1){
     fetchedBuffer[1] = *PC;
     printf("Fetched:  %d | Instruction: ", (PC - instMem) + 1);
     intob(fetchedBuffer[1]);
@@ -345,7 +357,7 @@ void printDataMem(){
 // Prints INS MEMORY
 void printInsMem(){
     for(int i = 0; i<1024; i++)
-        printf("INS[%d]: %d | ", i, (uint16_t)*(instMem+i));
+        printf("INS[%d]: %d | ", i, (int16_t)*(instMem+i));
 }
 
 // Handles Debuging at the start of a cycle
@@ -390,7 +402,8 @@ int main(){
         if((int16_t)fetchedBuffer[0] != -1)
             pthread_create(&decoder, NULL, &decode, NULL);
         else if (c > 0){
-            
+          ptod();
+          printf("No Instruction To Decode\n");  
         }
         else
             printf("No Instruction To Decode\n");

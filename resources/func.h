@@ -38,7 +38,7 @@ void split(char str1[], char splitLine[3][10]){
     int f = 1;// true on first char
     j = 0;
     ctr = 0;
-    
+
     for (i = 0; i <= (strlen(str1)); i++) {
         if (str1[i] == ' ' || str1[i] == '\0') {
             f = 1;
@@ -68,7 +68,7 @@ int strcicmp(char const *a, char const *b)
 
 void initIns(uint16_t* instMem){
     for (int i=0;i<1024;i++){
-        instMem[i] = 62000;
+        instMem[i] = -1;
     }
 }
 

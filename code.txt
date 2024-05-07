@@ -1,4 +1,4 @@
     space at the start of line to comment.
-LDR R0 0 jdskdbfksdg
+LDR R0 0
 LDR R3 0
 ADD R0 R3
