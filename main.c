@@ -6,8 +6,11 @@
 #include <ctype.h>
 #include "resources/func.h"
 
-int8_t* operand1;
-int8_t* operand2;
+int8_t* op1;
+int8_t* op2;
+int8_t operand1;
+int8_t operand2;
+int8_t* M;
 uint16_t instMem[1024];
 int8_t datatMem[2048]={7, 5};
 int8_t regs[64];
@@ -17,6 +20,7 @@ uint8_t decodedBuffer[2][3] = {{-1},{-1}};
 uint16_t fetchedBuffer[2] = {-1, -1};
 uint16_t* xPC;// PC of next instruction to be executed
 uint16_t* dPC;// PC of next instruction to be decoded
+int8_t imm;
 int cycle = 1;
 pthread_t fetcher, decoder, executer;
 int DEBUG = -1;
@@ -142,12 +146,20 @@ void fetch(){
 
 // Splits instruction into [OPCode, Operand 1, Operand 2] by shifting and masking the instruction then puts in decoded Buffer
 void decode(){
+    op1 = (regs + (decodedBuffer[0][1]));
+    op2 = (regs + (decodedBuffer[0][2]));
+    operand1 = *op1;
+    operand2 = *op2;
+    M = datatMem + (decodedBuffer[0][2]);
+    imm = (decodedBuffer[0][2]);
+    twosComp(&imm);
     printf("Decoded: %d | ", dPC - instMem);
     decodedBuffer[1][0] = fetchedBuffer[0] >> 12;
     decodedBuffer[1][1] = (fetchedBuffer[0] & 0xfc0) >> 6;
-    decodedBuffer[1][2] = (fetchedBuffer[0] & 0x3f);
+    decodedBuffer[1][2] = (fetchedBuffer[0] & 0x03f);
+    twosComp((decodedBuffer[1]+2));
     
-    printf("OPCode: %d | First Operand: %d | Second Operand: %d\n", decodedBuffer[1][0], decodedBuffer[1][1], decodedBuffer[1][2]);
+    printf("OPCode: %d | First Operand: %d | Second Operand: %d\n", decodedBuffer[1][0], decodedBuffer[1][1], (int8_t)decodedBuffer[1][2]);
 
 
 }
@@ -155,62 +167,62 @@ void decode(){
 // fetches decoded instruction from decoded buffer then using a Switch to select which operation to execute then executing it
 void execute(){
     xPC++;
-    operand1 = regs + (decodedBuffer[0][1]);
-    operand2 = regs + (decodedBuffer[0][2]);
     printf("Executed: %d | ", xPC - instMem);
     int opCode = decodedBuffer[0][0];
-    int8_t imm = decodedBuffer[0][2];
-    twosComp(&imm);
     switch (opCode)
     {
     case 0://ADD
-        status[4] = (((uint8_t)*operand1 + (uint8_t)*operand2)&(1<<8)) != 0;
-        if(!((*operand1<0) ^ (*operand2<0))){
-            status[3] = ((*operand1<0) ^ ((int8_t)(*operand2 + *operand1) < 0));
+        status[4] = (((uint8_t)operand1 + (uint8_t)operand2)&(1<<8)) != 0;
+        if(!((operand1<0) ^ (operand2<0))){
+            status[3] = ((operand1<0) ^ ((int8_t)(operand2 + operand1) < 0));
         }
         else status[3] = false;
-        printf("ADD | REG[%d](%d) += REG[%d](%d) | ", (int)operand1 - (int)regs, *operand1, (int)operand2 - (int)regs, *operand2);
-        printf("REG[%d] = ", (int)operand1 - (int)regs);
-        *operand1 += *operand2;
-        printf("%d\n", *operand1);
-        status[0] = (*operand1==0);
-        status[2] = (*operand1 < 0);
+        printf("ADD | REG[%d](%d) += REG[%d](%d) | ", (int)op1 - (int)regs, *op1, op2 - (int)regs, *op2);
+        printf("REG[%d] = ", (int)op1 - (int)regs);
+        operand1 += operand2;
+        *op1 = operand1;
+        printf("%d\n", *op1);
+        status[0] = (operand1==0);
+        status[2] = (operand1 < 0);
         status[1] = status[2] ^ status[3];
 
         break;
 
     case 1://SUB
-        if(((*operand1<0) ^ (*operand2<0))){
-            status[3] = ((*operand1<0) ^ ((int8_t)(*operand1 - *operand2) < 0));
+        if(((operand1<0) ^ (operand2<0))){
+            status[3] = ((operand1<0) ^ ((int8_t)(operand1 - operand2) < 0));
         }
         else status[3] = false;
-        printf("SUB | REG[%d](%d) -= REG[%d](%d) | ", (int)operand1 - (int)regs, *operand1, (int)operand2 - (int)regs, *operand2);
-        printf("REG[%d] = ", (int)operand1 - (int)regs);
-        *operand1 -= *operand2;
-        printf("%d\n", *operand1);
-        status[0]= (*operand1==0);
-        status[2] = (*operand1 < 0);
+        printf("SUB | REG[%d](%d) -= REG[%d](%d) | ", (int)op1 - (int)regs, *op1, op2 - (int)regs, *op2);
+        printf("REG[%d] = ", (int)op1 - (int)regs);
+        operand1 -= operand2;
+        *op1 = operand1;
+        printf("%d\n", *op1);
+        status[0]= (operand1==0);
+        status[2] = (operand1 < 0);
         status[1] = status[2] ^ status[3];
         break;
 
     case 2://MUL
-        printf("MUL | REG[%d](%d) *= REG[%d](%d) | ", (int)operand1 - (int)regs, *operand1, (int)operand2 - (int)regs, *operand2);
-        printf("REG[%d] = ", (int)operand1 - (int)regs);
-        *operand1 *= *operand2;
-        printf("%d\n", *operand1);
-        status[0]= (*operand1==0);
-        status[2] = (*operand1 < 0);
+        printf("MUL | REG[%d](%d) *= REG[%d](%d) | ", (int)op1 - (int)regs, *op1, op2 - (int)regs, *op2);
+        printf("REG[%d] = ", (int)op1 - (int)regs);
+        operand1 *= operand2;
+        *op1 = operand1;
+        printf("%d\n", *op1);
+        status[0]= (operand1==0);
+        status[2] = (operand1 < 0);
         break;
 
     case 3://MOVI
-        printf("MOVI | REG[%d](%d) = IMM(%d) | ", (int)operand1 - (int)regs, *operand1, imm);
-        printf("REG[%d] = ", (int)operand1 - (int)regs);
-        *operand1 = imm;
-        printf("%d\n", *operand1);
+        printf("MOVI | REG[%d](%d) = IMM(%d) | ", (int)op1 - (int)regs, *op1, imm);
+        printf("REG[%d] = ", (int)op1 - (int)regs);
+        operand1 = imm;
+        *op1 = operand1;
+        printf("%d\n", *op1);
         break;
 
     case 4://BEQZ
-        if(*operand1 == 0){
+        if(operand1 == 0){
             dPC = PC;
             PC = xPC + imm;
             xPC+= imm;
@@ -218,32 +230,34 @@ void execute(){
             clearBuffers();
             break;
         }
-        printf("BEQZ | NO BRANCHING | REG = %d", *operand1);
+        printf("BEQZ | NO BRANCHING | REG = %d", *op1);
         break;
 
     case 5://ANDI
-    printf("ANDI | REG[%d](%d) &= IMM(%d) | ", (int)operand1 - (int)regs, *operand1, imm);
-    printf("REG[%d] = ", (int)operand1 - (int)regs);
-    *operand1 &= imm;
-    printf("%d\n", *operand1);
-    status[0]= (*operand1==0);
-    status[2] = (*operand1 < 0);
+    printf("ANDI | REG[%d](%d) &= IMM(%d) | ", (int)op1 - (int)regs, *op1, imm);
+    printf("REG[%d] = ", (int)op1 - (int)regs);
+    operand1 &= imm;
+    *op1 = operand1;
+    printf("%d\n", *op1);
+    status[0]= (operand1==0);
+    status[2] = (operand1 < 0);
         break;
 
     case 6://EOR
-    printf("EOR | REG[%d](%d) ^= IMM(%d) | ", (int)operand1 - (int)regs, *operand1, imm);
-    printf("REG[%d] = ", (int)operand1 - (int)regs);
-    *operand1 ^= imm;
-    printf("%d\n", *operand1);
-    status[0]= (*operand1==0);
-    status[2] = (*operand1 < 0);
+    printf("EOR | REG[%d](%d) ^= IMM(%d) | ", (int)op1 - (int)regs, *op1, imm);
+    printf("REG[%d] = ", (int)op1 - (int)regs);
+    operand1 ^= imm;
+    *op1 = operand1;
+    printf("%d\n", *op1);
+    status[0]= (operand1==0);
+    status[2] = (operand1 < 0);
         break;
     
 
     case 7://BR
-        int16_t target = (*operand1<<8);
-        target |= *operand2;
-        printf("BR | BRANCHING TO: %d = %d || %d", target, *operand1, *operand2);
+        int16_t target = (operand1<<8);
+        target |= operand2;
+        printf("BR | BRANCHING TO: %d = %d || %d", target, operand1, operand2);
         dPC = PC;
         PC = target;
         xPC = PC;
@@ -251,38 +265,38 @@ void execute(){
         break;
     
     case 8://SAL
-        printf("SAL | REG[%d](%d) <<= IMM(%d) | ", (int)operand1 - (int)regs, *operand1, imm);
-        printf("REG[%d] = ", (int)operand1 - (int)regs);
-        *operand1 <<= imm;
-        printf("%d\n", *operand1);
-        status[0]= (*operand1==0);
-        status[2] = (*operand1 < 0);
+        printf("SAL | REG[%d](%d) <<= IMM(%d) | ", (int)op1 - (int)regs, *op1, imm);
+        printf("REG[%d] = ", (int)op1 - (int)regs);
+        operand1 <<= imm;
+        *op1 = operand1;
+        printf("%d\n", *op1);
+        status[0]= (operand1==0);
+        status[2] = (operand1 < 0);
         break;
 
     case 9://SAR
-        printf("SAL | REG[%d](%d) >>= IMM(%d) | ", (int)operand1 - (int)regs, *operand1, imm);
-        printf("REG[%d] = ", (int)operand1 - (int)regs);
-        *operand1 >>= imm;
-        printf("%d\n", *operand1);
-        status[0]= (*operand1==0);
-        status[2] = (*operand1 < 0);
+        printf("SAL | REG[%d](%d) >>= IMM(%d) | ", (int)op1 - (int)regs, *op1, imm);
+        printf("REG[%d] = ", (int)op1 - (int)regs);
+        operand1 >>= imm;
+        *op1 = operand1;
+        printf("%d\n", *op1);
+        status[0]= (operand1==0);
+        status[2] = (operand1 < 0);
         break;
 
     case 10://LDR
-        operand2 = &datatMem[0] + (decodedBuffer[0][2]);
-        printf("LDR | REG[%d](%d) = MEM[%d](%d) | ", (int)operand1 - (int)regs, *operand1, (int)operand2 - (int)datatMem, *operand2);
-        printf("REG[%d] = ", (int)operand1 - (int)regs);
-        *operand1 = *operand2;
-        printf("%d\n", *operand1);
+        printf("LDR | REG[%d](%d) = MEM[%d](%d) | ", (int)op1 - (int)regs, *op1, (int)M - (int)datatMem, *M);
+        printf("REG[%d] = ", (int)op1 - (int)regs);
+        *op1 = *M;
+        printf("%d\n", *op1);
         break;
     
 
     case 11://STR
-        operand2 = &datatMem[0] + (decodedBuffer[0][2]);
-        printf("STR | MEM[%d](%d) = REG[%d](%d) | ", (int)operand2 - (int)datatMem, *operand2, (int)operand1 - (int)regs, *operand1);
-        printf("MEM[%d] = ", (int)operand2 - (int)datatMem);
-        *operand2 = *operand1;
-        printf("%d\n", *operand2);
+        printf("STR | MEM[%d](%d) = REG[%d](%d) | ", (int)M - (int)datatMem, *M, (int)op1 - (int)regs, operand1);
+        printf("MEM[%d] = ", op2 - (int)datatMem);
+        *M = operand1;
+        printf("%d\n", *M);
         break;
 
     default:
