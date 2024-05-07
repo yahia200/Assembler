@@ -12,7 +12,7 @@ int8_t operand1;
 int8_t operand2;
 int8_t* M;
 uint16_t instMem[1024];
-int8_t datatMem[2048]={7, 5};
+int8_t datatMem[2048]={-128};
 int8_t regs[64];
 bool status[8];// 0=Zero, 1=Sign, 2=Negative, 3=Two’s Complement Overflow, 4=Carry
 uint16_t* PC=instMem;
@@ -44,10 +44,12 @@ void init(){
 
 
     while (fgets(line, sizeof(line), file)) {// While the Assembly code has lines
-        //clearLine(splitLine);
+        printf("%d\n", *line);
+        if(line[0] > 32){
         split(line, splitLine);// Split Code Line into [OPCode, Operand 1, Operand 2] and put it in the splitLine Array
         addToInsMem(splitLine, c-1);// Add parsed Instruction to Memory and increment c
         c++;
+        }
         
 
         
@@ -71,7 +73,7 @@ int parseOP(char OP[10]){
         if(strcicmp(OP, OPs[i]) == 0)// Compare input to possible instructions ignoring case
             return (int)i;//return index of instruction which is equivalent to its OPCode
     }
-     printf("Unrecognized Instruction: %s\n", OP);//Check wrong Spelling
+     printf("Unrecognized Instruction: %s ON LINE: %d\n", OP, c);//Check wrong Spelling
      exit(-1);
 
 }
@@ -82,7 +84,7 @@ int parseOperand(char OP[10]){
     for(int i=0; i<10;i++){// Check if entered value wasn't int
         if (i == 0 && OP[i] == '-')
             continue;
-        else if (!isInt(OP[i]) && OP[i] > 31){
+        else if (!isInt(OP[i]) && OP[i] > 32){
             printf("Unrecognized Operand: %s ON LINE: %d\n", OP, c);
             exit(-1);
         }
@@ -146,13 +148,7 @@ void fetch(){
 
 // Splits instruction into [OPCode, Operand 1, Operand 2] by shifting and masking the instruction then puts in decoded Buffer
 void decode(){
-    op1 = (regs + (decodedBuffer[0][1]));
-    op2 = (regs + (decodedBuffer[0][2]));
-    operand1 = *op1;
-    operand2 = *op2;
-    M = datatMem + (decodedBuffer[0][2]);
-    imm = (decodedBuffer[0][2]);
-    twosComp(&imm);
+    ptod();
     printf("Decoded: %d | ", dPC - instMem);
     decodedBuffer[1][0] = fetchedBuffer[0] >> 12;
     decodedBuffer[1][1] = (fetchedBuffer[0] & 0xfc0) >> 6;
@@ -224,6 +220,7 @@ void execute(){
     case 4://BEQZ
         if(operand1 == 0){
             dPC = PC;
+            printf("%d\n", xPC);
             PC = xPC + imm;
             xPC+= imm;
             printf("BEQZ | BRANCHING TO: %d\n", (PC - instMem) + 1);
@@ -294,7 +291,7 @@ void execute(){
 
     case 11://STR
         printf("STR | MEM[%d](%d) = REG[%d](%d) | ", (int)M - (int)datatMem, *M, (int)op1 - (int)regs, operand1);
-        printf("MEM[%d] = ", op2 - (int)datatMem);
+        printf("MEM[%d] = ", (int)M - (int)datatMem);
         *M = operand1;
         printf("%d\n", *M);
         break;
@@ -371,6 +368,17 @@ void clearBuffers(){
     }
 }
 
+
+void ptod(){// pointer to data
+    op1 = (regs + (decodedBuffer[0][1]));
+            op2 = (regs + (decodedBuffer[0][2]));
+            operand1 = *op1;
+            operand2 = *op2;
+            M = datatMem + (decodedBuffer[0][2]);
+            imm = (decodedBuffer[0][2]);
+            twosComp(&imm);
+}
+
 // Main program Flow
 int main(){
     init();
@@ -381,6 +389,9 @@ int main(){
 
         if((int16_t)fetchedBuffer[0] != -1)
             pthread_create(&decoder, NULL, &decode, NULL);
+        else if (c > 0){
+            
+        }
         else
             printf("No Instruction To Decode\n");
         

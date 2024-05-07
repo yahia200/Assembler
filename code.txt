@@ -1,14 +1,4 @@
-ADD R0 R0
-LDR R0 0
-LDR R1 1
-ADD R0 R1
-MOVI R2 -8
-ADD R0 R2
-STR R0 5
-LDR R3 5
-SUB R0 R3
-BEQZ R0 -9
-LDR R0 0
-LDR R1 1
-LDR R0 0
-LDR R1 1
+    space at the start of line to comment.
+LDR R0 0 jdskdbfksdg
+LDR R3 0
+ADD R0 R3

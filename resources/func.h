@@ -35,18 +35,21 @@ void println(int x){
 
 void split(char str1[], char splitLine[3][10]){
     int i, j, ctr;
-
+    int f = 1;// true on first char
     j = 0;
     ctr = 0;
-
+    
     for (i = 0; i <= (strlen(str1)); i++) {
         if (str1[i] == ' ' || str1[i] == '\0') {
+            f = 1;
             splitLine[ctr][j] = '\0';
             ctr++;
             j = 0;
         } else {
-            if(ctr > 0 && str1[i] == 'R')
+            if(ctr > 0 && j == 0 && str1[i] == 'R' && f){
+                f = 0;
                 continue;
+            }
             splitLine[ctr][j] = str1[i];
             j++;
         }
