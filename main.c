@@ -230,7 +230,7 @@ void execute(){
         int16_t target = (*operand1<<8);
         target |= *operand2;
         printf("BR | BRANCHING TO: %d = %d || %d", target, *operand1, *operand2);
-        PC = target;
+        PC = insMem + target;
         break;
     
     case 8://SAL
