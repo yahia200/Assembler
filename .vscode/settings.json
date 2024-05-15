@@ -1,5 +1,5 @@
 {
-    "cmake.sourceDirectory": "/wsl.localhost/Ubuntu/home/loaymarwan12/HelloWorld/CA/CA",
+    "cmake.sourceDirectory": "/home/yahia/GitHub/Assembler",
     "files.associations": {
         "pthread.h": "c",
         "func.h": "c"

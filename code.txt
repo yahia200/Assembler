@@ -1,4 +1,5 @@
     space at the start of line to comment.
 LDR R0 0
 LDR R3 0
+movi R2 -70
 ADD R0 R3

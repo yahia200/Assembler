@@ -114,11 +114,12 @@ void addToInsMem(char splitLine[3][10], int c){
         }
         operand1 &= 0x003f;
         int8_t operand2 = parseOperand(splitLine[2]);
-        operand2 &= 0x003f;
-        if((uint8_t)operand2 & 0x003f > 127){// Check operand size
-            printf("Operands Consist Of Only 6 BITS Can't Be: %d\n", operand1);
+        
+        if((uint8_t)operand2 > 63){// Check operand size
+            printf("Operands Consist Of Only 6 BITS Can't Be: %d\n", operand2);
             exit(-1);
         }
+        operand2 &= 0x003f;
         uint16_t ins = (OP<<12) | (operand1<<6) | (operand2);
         instMem[c] = ins;
 
@@ -268,7 +269,7 @@ void execute(){
         target |= operand2;
         printf("BR | BRANCHING TO: %d = %d || %d", target, operand1, operand2);
         dPC = PC;
-        PC = target;
+        PC = instMem + target;
         xPC = PC;
         clearBuffers();
         break;
